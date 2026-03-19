@@ -30,10 +30,18 @@ export default {
 
     const url = new URL(request.url);
     const path = url.pathname;
+
+    // Root — friendly landing page for direct visits
+    if (path === "/" || path === "") {
+      return new Response("Sprite Booth CORS proxy is running. This endpoint is called by the Sprite Booth frontend — visit your Cloudflare Pages URL to use the app.", {
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
+
     const apiKey = getApiKey(request);
 
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: "No API key provided" }), {
+      return new Response(JSON.stringify({ error: "No API key provided. Enter your key in the Sprite Booth app settings." }), {
         status: 401,
         headers: { "Content-Type": "application/json", ...corsHeaders(request, env) },
       });
@@ -44,11 +52,14 @@ export default {
 
       // POST /api/upload/image
       if (path === "/api/upload/image" && request.method === "POST") {
+        const contentType = request.headers.get("Content-Type") || "";
         upstream = await fetch(`${CLOUD_BASE}/api/upload/image`, {
           method: "POST",
-          headers: { "X-API-Key": apiKey },
+          headers: {
+            "X-API-Key": apiKey,
+            "Content-Type": contentType,
+          },
           body: request.body,
-          duplex: "half",
         });
       }
 
@@ -61,7 +72,6 @@ export default {
             "Content-Type": "application/json",
           },
           body: request.body,
-          duplex: "half",
         });
       }
 
