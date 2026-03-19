@@ -1,0 +1,6 @@
+name = "sprite-booth-proxy"
+main = "src/index.js"
+compatibility_date = "2024-09-25"
+
+[vars]
+ALLOWED_ORIGIN = "*"
