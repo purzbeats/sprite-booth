@@ -1,0 +1,1630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Sprite Booth</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #1a1a2e;
+      --surface: #16213e;
+      --primary: #e94560;
+      --accent: #0f3460;
+      --text: #eee;
+      --text-dim: #888;
+      --green: #4ecca3;
+      --pixel-border: 4px;
+    }
+
+    body {
+      font-family: 'Press Start 2P', monospace;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+    }
+
+    header {
+      text-align: center;
+      padding: 1.5rem 1rem 0.5rem;
+      width: 100%;
+    }
+
+    header h1 {
+      font-size: clamp(1.2rem, 5vw, 2rem);
+      color: var(--primary);
+      text-shadow: 3px 3px 0 #0f3460;
+      letter-spacing: 2px;
+    }
+
+    header p {
+      font-size: 0.55rem;
+      color: var(--text-dim);
+      margin-top: 0.5rem;
+      line-height: 1.6;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      width: 100%;
+      max-width: 500px;
+      position: relative;
+    }
+
+    /* Pixel-art bordered container */
+    .booth {
+      width: 100%;
+      background: var(--surface);
+      border: var(--pixel-border) solid var(--accent);
+      box-shadow:
+        inset 0 0 0 var(--pixel-border) #0a1628,
+        8px 8px 0 rgba(0,0,0,0.3);
+      padding: 1rem;
+      position: relative;
+    }
+
+    /* --- SCREEN: Camera --- */
+    .camera-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1;
+      background: #000;
+      overflow: hidden;
+      border: 3px solid #333;
+      image-rendering: pixelated;
+    }
+
+    .camera-wrap video,
+    .camera-wrap canvas,
+    .camera-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    #cameraPreview { transform: scaleX(-1); }
+    .camera-wrap canvas { display: none; }
+
+    .snap-flash {
+      position: absolute;
+      inset: 0;
+      background: white;
+      opacity: 0;
+      pointer-events: none;
+      animation: flash 0.3s ease-out;
+    }
+
+    @keyframes flash {
+      0% { opacity: 0.9; }
+      100% { opacity: 0; }
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.65rem;
+      padding: 0.75rem 1.25rem;
+      border: 3px solid;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: transform 0.1s, box-shadow 0.1s;
+      box-shadow: 4px 4px 0 rgba(0,0,0,0.4);
+      white-space: nowrap;
+      text-decoration: none;
+    }
+
+    .btn:active {
+      transform: translate(2px, 2px);
+      box-shadow: 2px 2px 0 rgba(0,0,0,0.4);
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      border-color: #c1354d;
+    }
+
+    .btn-secondary {
+      background: var(--accent);
+      color: white;
+      border-color: #0a2440;
+    }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .upload-label { display: inline-block; }
+    .upload-label input { display: none; }
+
+    .action-input {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.55rem;
+      background: #0a1628;
+      color: var(--text);
+      border: 3px solid var(--accent);
+      padding: 0.6rem 0.75rem;
+      text-align: center;
+      width: 100%;
+    }
+
+    .action-input::placeholder { color: var(--text-dim); }
+    .action-input:focus { outline: none; border-color: var(--primary); }
+
+    .camera-select {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.5rem;
+      background: var(--accent);
+      color: var(--text);
+      border: 2px solid #0a2440;
+      padding: 0.4rem;
+      margin-top: 0.5rem;
+      width: 100%;
+      display: none;
+    }
+
+    /* --- SCREEN: Processing --- */
+    .processing {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 1.5rem 0;
+    }
+
+    .pixel-progress {
+      width: 100%;
+      height: 24px;
+      background: #0a1628;
+      border: 3px solid var(--accent);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pixel-progress-bar {
+      height: 100%;
+      background: var(--primary);
+      width: 0%;
+      transition: width 0.4s ease-out;
+    }
+
+    .pixel-progress-bar.indeterminate {
+      width: 30%;
+      animation: indeterminate 1.5s infinite ease-in-out;
+    }
+
+    @keyframes indeterminate {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(400%); }
+    }
+
+    .progress-pct {
+      font-size: 0.7rem;
+      color: var(--green);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status-text {
+      font-size: 0.55rem;
+      color: var(--text-dim);
+      text-align: center;
+      line-height: 1.8;
+    }
+
+    .status-text.current-step {
+      color: var(--text);
+      font-size: 0.6rem;
+    }
+
+    /* Activity log */
+    .activity-log {
+      width: 100%;
+      max-height: 160px;
+      overflow-y: auto;
+      background: #0a0a18;
+      border: 2px solid #222;
+      padding: 0.5rem;
+      margin-top: 0.5rem;
+      scrollbar-width: thin;
+      scrollbar-color: var(--accent) #0a0a18;
+    }
+
+    .activity-log::-webkit-scrollbar { width: 6px; }
+    .activity-log::-webkit-scrollbar-track { background: #0a0a18; }
+    .activity-log::-webkit-scrollbar-thumb { background: var(--accent); }
+
+    .log-entry {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.4rem;
+      line-height: 2;
+      color: var(--text-dim);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .log-entry.done { color: var(--green); }
+    .log-entry.active { color: var(--primary); }
+    .log-entry.error { color: #ff6b6b; }
+    .log-entry.cached { color: #666; }
+
+    /* Particle effects during processing */
+    .particle-canvas {
+      position: absolute;
+      inset: -80px -60px;
+      pointer-events: none;
+      overflow: visible;
+      z-index: 20;
+    }
+
+    .particle-canvas svg {
+      position: absolute;
+      filter: drop-shadow(0 0 6px currentColor);
+      animation: particle-life linear forwards;
+      will-change: transform, opacity;
+    }
+
+    @keyframes particle-life {
+      0% {
+        opacity: 0;
+        transform: scale(0.4) translate(0, 0) rotate(0deg);
+      }
+      10% {
+        opacity: 0.9;
+        transform: scale(1) translate(calc(var(--dx) * 0.1), calc(var(--dy) * 0.1)) rotate(10deg);
+      }
+      50% {
+        opacity: 0.65;
+        transform: scale(0.8) translate(calc(var(--dx) * 0.55), calc(var(--dy) * 0.55)) rotate(calc(var(--rot-end, 45deg) * 0.5));
+      }
+      100% {
+        opacity: 0;
+        transform: scale(0.3) translate(var(--dx), var(--dy)) rotate(var(--rot-end, 45deg));
+      }
+    }
+
+    /* Pixel art spinner */
+    .pixel-spinner {
+      display: inline-block;
+      animation: spin 0.8s steps(4) infinite;
+    }
+
+    @keyframes spin {
+      0% { content: '|'; }
+      25% { content: '/'; }
+      50% { content: '-'; }
+      75% { content: '\\'; }
+    }
+
+    .spinner-frames::after {
+      content: '';
+      animation: spinFrames 0.6s steps(4) infinite;
+    }
+
+    @keyframes spinFrames {
+      0% { content: '[ |  ]'; }
+      25% { content: '[ /  ]'; }
+      50% { content: '[ -  ]'; }
+      75% { content: '[ \\ ]'; }
+    }
+
+    /* --- SCREEN: Result --- */
+    .result {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .result-display {
+      background: #000;
+      border: 3px solid #333;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      width: 100%;
+    }
+
+    .result-display img {
+      image-rendering: pixelated;
+      max-width: 100%;
+    }
+
+    .sprite-animation {
+      width: 128px;
+      height: 128px;
+      image-rendering: pixelated;
+      border: 2px solid #444;
+    }
+
+    .spritesheet-preview {
+      max-width: 100%;
+      border: 2px solid #444;
+    }
+
+    .result-label {
+      font-size: 0.5rem;
+      color: var(--text-dim);
+      text-align: center;
+    }
+
+    /* Error */
+    .error-msg {
+      color: var(--primary);
+      font-size: 0.55rem;
+      text-align: center;
+      padding: 1rem;
+      line-height: 1.8;
+      display: none;
+    }
+
+    /* Scanline overlay */
+    .booth::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.05) 2px,
+        rgba(0,0,0,0.05) 4px
+      );
+      pointer-events: none;
+    }
+
+    /* --- API Key Overlay --- */
+    .key-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: rgba(10, 10, 20, 0.92);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .hidden { display: none !important; }
+
+    @media (min-width: 600px) {
+      main { padding: 2rem; max-width: 600px; }
+      .booth { padding: 1.5rem; }
+    }
+
+    @media (min-width: 900px) {
+      main { max-width: 700px; }
+      .booth { padding: 2rem; }
+      .sprite-animation { width: 192px; height: 192px; }
+    }
+
+    @media (min-width: 1200px) {
+      main { max-width: 800px; }
+    }
+
+    .checkerboard {
+      background-image:
+        linear-gradient(45deg, #333 25%, transparent 25%),
+        linear-gradient(-45deg, #333 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #333 75%),
+        linear-gradient(-45deg, transparent 75%, #333 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    }
+
+    /* Header with history button */
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      width: 100%;
+    }
+
+    .btn-icon {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      border: 2px solid var(--accent);
+      background: var(--surface);
+      color: var(--text-dim);
+      cursor: pointer;
+      position: absolute;
+      right: 1rem;
+      top: 1.5rem;
+    }
+
+    .btn-icon:hover { color: var(--text); border-color: var(--primary); }
+
+    /* --- GALLERY SCREEN --- */
+    .gallery-screen {
+      display: none;
+      flex-direction: column;
+      gap: 1rem;
+      width: 100%;
+      max-width: 800px;
+      padding: 1rem;
+    }
+
+    .gallery-screen.visible {
+      display: flex;
+    }
+
+    .gallery-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .gallery-header h2 {
+      font-size: 0.8rem;
+      color: var(--primary);
+    }
+
+    .gallery-empty {
+      font-size: 0.55rem;
+      color: var(--text-dim);
+      text-align: center;
+      padding: 3rem 1rem;
+      line-height: 2;
+    }
+
+    .gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 1rem;
+    }
+
+    .gallery-card {
+      background: var(--surface);
+      border: 3px solid var(--accent);
+      cursor: pointer;
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+
+    .gallery-card:hover {
+      border-color: var(--primary);
+    }
+
+    .gallery-card img {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: contain;
+      background: #000;
+      image-rendering: pixelated;
+    }
+
+    .gallery-card-info {
+      padding: 0.5rem;
+      font-size: 0.4rem;
+      color: var(--text-dim);
+      text-align: center;
+      line-height: 1.8;
+    }
+
+    /* Gallery detail view */
+    .gallery-detail {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      width: 100%;
+      max-width: 500px;
+      padding: 1rem;
+    }
+
+    .gallery-detail.visible { display: flex; }
+
+    .gallery-detail .result-display {
+      background: #000;
+      border: 3px solid #333;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      width: 100%;
+    }
+
+    .gallery-detail img {
+      max-width: 100%;
+      image-rendering: pixelated;
+    }
+
+    .gallery-detail .sprite-animation {
+      width: 128px;
+      height: 128px;
+      border: 2px solid #444;
+    }
+
+    .gallery-detail .spritesheet-preview {
+      max-width: 100%;
+      border: 2px solid #444;
+    }
+
+    .gallery-detail .input-preview {
+      max-width: 200px;
+      border: 2px solid #444;
+    }
+
+    @media (min-width: 600px) {
+      .gallery-grid {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Sprite Booth</h1>
+    <p>Strike a pose &amp; become a pixel sprite</p>
+    <button id="settingsBtn" class="btn-icon" style="left:1rem;right:auto">Key</button>
+    <button id="historyBtn" class="btn-icon">History</button>
+  </header>
+
+  <main>
+    <div class="booth">
+      <!-- CAMERA SCREEN -->
+      <div id="cameraScreen">
+        <div class="camera-wrap">
+          <video id="cameraPreview" autoplay playsinline muted></video>
+          <canvas id="captureCanvas"></canvas>
+          <img id="photoPreview" style="display:none" alt="Your photo">
+        </div>
+        <select id="cameraSelect" class="camera-select"></select>
+        <div class="controls">
+          <button id="snapBtn" class="btn btn-primary" disabled>Snap!</button>
+          <label class="upload-label">
+            <span class="btn btn-secondary">Upload</span>
+            <input type="file" id="fileInput" accept="image/*">
+          </label>
+        </div>
+        <div id="postSnap" class="controls hidden" style="flex-direction:column;align-items:stretch;">
+          <input id="actionInput" class="action-input" type="text" placeholder="dancing" value="dancing" maxlength="120">
+          <div style="display:flex;gap:0.75rem;justify-content:center;">
+            <button id="generateBtn" class="btn btn-primary">Sprite Me!</button>
+            <button id="retakeBtn" class="btn btn-secondary">Retake</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROCESSING SCREEN -->
+      <div id="processingScreen" class="processing">
+        <div class="progress-pct" id="progressPct">0%</div>
+        <div class="pixel-progress">
+          <div class="pixel-progress-bar indeterminate" id="progressBar"></div>
+        </div>
+        <div class="status-text current-step" id="statusText">Uploading your photo...</div>
+        <div class="activity-log" id="activityLog"></div>
+        <div class="status-text" id="elapsedText">Elapsed: 0s</div>
+        <div class="controls" style="margin-top:0.5rem;">
+          <button id="cancelBtn" class="btn btn-secondary">Cancel</button>
+        </div>
+      </div>
+
+      <!-- RESULT SCREEN -->
+      <div id="resultScreen" class="result">
+        <div class="result-display">
+          <div class="result-label">Your Sprite Animation</div>
+          <img id="resultGif" class="sprite-animation checkerboard" alt="Animated sprite">
+          <div class="result-label">Sprite Sheet</div>
+          <img id="resultSheet" class="spritesheet-preview" alt="Sprite sheet">
+        </div>
+        <div class="controls">
+          <a id="downloadGif" class="btn btn-primary" download="sprite-animation.gif">Save GIF</a>
+          <a id="downloadWebp" class="btn btn-secondary" download="sprite-animation.webp" style="display:none">Save WebP</a>
+          <a id="downloadSheet" class="btn btn-secondary" download="sprite-sheet.png" style="display:none">Save Sheet</a>
+          <button id="retryBtn" class="btn btn-primary">Retry</button>
+          <button id="restartBtn" class="btn btn-secondary">New Photo</button>
+        </div>
+      </div>
+
+      <!-- ERROR -->
+      <div id="errorMsg" class="error-msg"></div>
+    </div>
+    <div class="particle-canvas" id="particleCanvas"></div>
+  </main>
+
+  <!-- GALLERY SCREEN (outside main, full width) -->
+  <div id="galleryScreen" class="gallery-screen">
+    <div class="gallery-header">
+      <h2>History</h2>
+      <button id="galleryBackBtn" class="btn btn-secondary">Back</button>
+    </div>
+    <div id="galleryGrid" class="gallery-grid"></div>
+    <div id="galleryEmpty" class="gallery-empty hidden">No generations yet. Take a photo and create your first sprite!</div>
+  </div>
+
+  <!-- GALLERY DETAIL VIEW -->
+  <div id="galleryDetail" class="gallery-detail">
+    <div class="gallery-header" style="width:100%">
+      <h2>Details</h2>
+      <button id="detailBackBtn" class="btn btn-secondary">Back</button>
+    </div>
+    <div class="result-display">
+      <div class="result-label">Input Photo</div>
+      <img id="detailInput" class="input-preview" alt="Input photo">
+      <div class="result-label">Sprite Animation</div>
+      <img id="detailGif" class="sprite-animation checkerboard" alt="Animated sprite">
+      <div class="result-label">Sprite Sheet</div>
+      <img id="detailSheet" class="spritesheet-preview" alt="Sprite sheet">
+    </div>
+    <div class="controls">
+      <a id="detailDownloadGif" class="btn btn-primary" download="sprite-animation.gif">Save GIF</a>
+      <a id="detailDownloadWebp" class="btn btn-secondary" download="sprite-animation.webp" style="display:none">Save WebP</a>
+      <a id="detailDownloadSheet" class="btn btn-secondary" download="sprite-sheet.png" style="display:none">Save Sheet</a>
+    </div>
+    <div class="result-label" id="detailDate"></div>
+  </div>
+
+  <!-- API KEY SETUP OVERLAY -->
+  <div id="keySetup" class="key-overlay hidden">
+    <div class="booth" style="max-width:440px;">
+      <h2 style="font-size:0.75rem;color:var(--primary);text-align:center;margin-bottom:1rem;">API Key Required</h2>
+      <p style="font-size:0.45rem;color:var(--text-dim);line-height:2;text-align:center;margin-bottom:1rem;">
+        Get a free key at<br>
+        <a href="https://platform.comfy.org/login" target="_blank" style="color:var(--green);">platform.comfy.org/login</a>
+      </p>
+      <input id="keySetupInput" class="action-input" type="password" placeholder="comfyui-xxxx..." autocomplete="off" spellcheck="false">
+      <div class="controls" style="margin-top:1rem;">
+        <button id="keySetupSave" class="btn btn-primary">Save Key</button>
+      </div>
+      <p id="keySetupError" style="font-size:0.4rem;color:var(--primary);text-align:center;margin-top:0.75rem;display:none;"></p>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settingsModal" class="key-overlay hidden">
+    <div class="booth" style="max-width:440px;">
+      <h2 style="font-size:0.75rem;color:var(--primary);text-align:center;margin-bottom:1rem;">API Key Settings</h2>
+      <input id="settingsKeyInput" class="action-input" type="password" placeholder="comfyui-xxxx..." autocomplete="off" spellcheck="false">
+      <div class="controls" style="margin-top:1rem;">
+        <button id="settingsKeySave" class="btn btn-primary">Update</button>
+        <button id="settingsKeyDelete" class="btn btn-secondary">Remove</button>
+        <button id="settingsClose" class="btn btn-secondary">Close</button>
+      </div>
+      <p style="font-size:0.4rem;color:var(--text-dim);text-align:center;margin-top:0.75rem;line-height:2;">
+        Stored in your browser only (localStorage).<br>Never sent anywhere except Comfy Cloud.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const $ = (sel) => document.querySelector(sel);
+    const video = $("#cameraPreview");
+    const canvas = $("#captureCanvas");
+    const photoPreview = $("#photoPreview");
+    const snapBtn = $("#snapBtn");
+    const fileInput = $("#fileInput");
+    const generateBtn = $("#generateBtn");
+    const retakeBtn = $("#retakeBtn");
+    const postSnap = $("#postSnap");
+    const cameraSelect = $("#cameraSelect");
+    const statusText = $("#statusText");
+    const progressBar = $("#progressBar");
+    const progressPct = $("#progressPct");
+    const activityLog = $("#activityLog");
+    const elapsedText = $("#elapsedText");
+    const errorMsg = $("#errorMsg");
+
+    let currentStream = null;
+    let capturedBlob = null;
+    let eventSource = null;
+    let elapsedTimer = null;
+    let currentClientId = null;
+    let timeoutTimer = null;
+
+    // ── Camera Setup ──
+
+    async function startCamera(deviceId) {
+      if (currentStream) {
+        currentStream.getTracks().forEach((t) => t.stop());
+      }
+
+      const constraints = {
+        video: {
+          width: { ideal: 1024 },
+          height: { ideal: 1024 },
+          facingMode: deviceId ? undefined : "user",
+          deviceId: deviceId ? { exact: deviceId } : undefined,
+        },
+        audio: false,
+      };
+
+      try {
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+        snapBtn.disabled = false;
+        await enumerateCameras();
+      } catch (err) {
+        console.warn("Camera access denied or unavailable:", err);
+        snapBtn.disabled = true;
+      }
+    }
+
+    async function enumerateCameras() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = devices.filter((d) => d.kind === "videoinput");
+      if (cameras.length > 1) {
+        cameraSelect.style.display = "block";
+        cameraSelect.innerHTML = cameras
+          .map(
+            (c, i) =>
+              `<option value="${c.deviceId}">${c.label || "Camera " + (i + 1)}</option>`
+          )
+          .join("");
+        const activeTrack = currentStream?.getVideoTracks()[0];
+        if (activeTrack) {
+          const settings = activeTrack.getSettings();
+          if (settings.deviceId) cameraSelect.value = settings.deviceId;
+        }
+      }
+    }
+
+    cameraSelect.addEventListener("change", () => startCamera(cameraSelect.value));
+
+    // ── Capture Photo ──
+
+    snapBtn.addEventListener("click", () => {
+      const ctx = canvas.getContext("2d");
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      const size = Math.min(vw, vh);
+      const sx = (vw - size) / 2;
+      const sy = (vh - size) / 2;
+
+      canvas.width = 1024;
+      canvas.height = 1024;
+      ctx.save();
+      ctx.translate(1024, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, sx, sy, size, size, 0, 0, 1024, 1024);
+      ctx.restore();
+
+      canvas.toBlob((blob) => {
+        capturedBlob = blob;
+        photoPreview.src = URL.createObjectURL(blob);
+        showPhotoPreview();
+      }, "image/png");
+
+      const flash = document.createElement("div");
+      flash.className = "snap-flash";
+      video.parentElement.appendChild(flash);
+      flash.addEventListener("animationend", () => flash.remove());
+    });
+
+    function showPhotoPreview() {
+      video.style.display = "none";
+      photoPreview.style.display = "block";
+      snapBtn.parentElement.classList.add("hidden");
+      postSnap.classList.remove("hidden");
+    }
+
+    function resetToCamera() {
+      video.style.display = "block";
+      photoPreview.style.display = "none";
+      snapBtn.parentElement.classList.remove("hidden");
+      postSnap.classList.add("hidden");
+      capturedBlob = null;
+      errorMsg.style.display = "none";
+    }
+
+    retakeBtn.addEventListener("click", resetToCamera);
+
+    // ── File Upload ──
+
+    fileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const img = new Image();
+      img.onload = () => {
+        const ctx = canvas.getContext("2d");
+        canvas.width = 1024;
+        canvas.height = 1024;
+        const size = Math.min(img.width, img.height);
+        const sx = (img.width - size) / 2;
+        const sy = (img.height - size) / 2;
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, 1024, 1024);
+        canvas.toBlob((blob) => {
+          capturedBlob = blob;
+          photoPreview.src = URL.createObjectURL(blob);
+          showPhotoPreview();
+        }, "image/png");
+        URL.revokeObjectURL(img.src);
+      };
+      img.src = URL.createObjectURL(file);
+      fileInput.value = "";
+    });
+
+    // ── Activity Log ──
+
+    function addLog(text, className = "") {
+      const entry = document.createElement("div");
+      entry.className = `log-entry ${className}`;
+      entry.textContent = text;
+      activityLog.appendChild(entry);
+      activityLog.scrollTop = activityLog.scrollHeight;
+    }
+
+    function clearLog() {
+      activityLog.innerHTML = "";
+    }
+
+    let trickleTimer = null;
+    let trickleBase = 0;
+
+    function updateProgress(completed, total) {
+      stopTrickle();
+      const pct = Math.round((completed / total) * 100);
+      progressBar.classList.remove("indeterminate");
+      progressBar.style.width = pct + "%";
+      progressPct.textContent = pct + "%";
+    }
+
+    function startTrickle(basePct, extraPct, durationMs) {
+      stopTrickle();
+      trickleBase = basePct;
+      const start = Date.now();
+      trickleTimer = setInterval(() => {
+        const elapsed = Date.now() - start;
+        const t = Math.min(elapsed / durationMs, 1);
+        // Ease-out: fast at first, slows down toward the cap
+        const eased = 1 - Math.pow(1 - t, 3);
+        const pct = Math.round(trickleBase + extraPct * eased);
+        progressBar.style.width = pct + "%";
+        progressPct.textContent = pct + "%";
+        if (t >= 1) stopTrickle();
+      }, 500);
+    }
+
+    function stopTrickle() {
+      if (trickleTimer) {
+        clearInterval(trickleTimer);
+        trickleTimer = null;
+      }
+    }
+
+    function startElapsedTimer() {
+      const start = Date.now();
+      elapsedText.textContent = "Elapsed: 0s";
+      elapsedTimer = setInterval(() => {
+        const secs = Math.floor((Date.now() - start) / 1000);
+        elapsedText.textContent = `Elapsed: ${secs}s`;
+      }, 1000);
+    }
+
+    function stopElapsedTimer() {
+      if (elapsedTimer) {
+        clearInterval(elapsedTimer);
+        elapsedTimer = null;
+      }
+    }
+
+    // ── Pixel Particle System ──
+
+    const PIXEL_SHAPES = [
+      // Sword
+      `<svg width="20" height="20" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="0" width="2" height="5" fill="currentColor"/>
+        <rect x="1" y="5" width="6" height="1" fill="currentColor"/>
+        <rect x="3" y="6" width="2" height="2" fill="currentColor"/>
+      </svg>`,
+      // Star
+      `<svg width="20" height="20" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="0" width="2" height="2" fill="currentColor"/>
+        <rect x="1" y="2" width="6" height="1" fill="currentColor"/>
+        <rect x="0" y="3" width="8" height="2" fill="currentColor"/>
+        <rect x="1" y="5" width="6" height="1" fill="currentColor"/>
+        <rect x="2" y="6" width="1" height="2" fill="currentColor"/>
+        <rect x="5" y="6" width="1" height="2" fill="currentColor"/>
+      </svg>`,
+      // Heart
+      `<svg width="20" height="20" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="2" height="2" fill="currentColor"/>
+        <rect x="5" y="1" width="2" height="2" fill="currentColor"/>
+        <rect x="0" y="2" width="8" height="2" fill="currentColor"/>
+        <rect x="1" y="4" width="6" height="1" fill="currentColor"/>
+        <rect x="2" y="5" width="4" height="1" fill="currentColor"/>
+        <rect x="3" y="6" width="2" height="1" fill="currentColor"/>
+      </svg>`,
+      // Potion
+      `<svg width="20" height="20" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="0" width="2" height="1" fill="currentColor"/>
+        <rect x="2" y="1" width="4" height="1" fill="currentColor"/>
+        <rect x="3" y="2" width="2" height="1" fill="currentColor"/>
+        <rect x="1" y="3" width="6" height="4" fill="currentColor"/>
+        <rect x="2" y="7" width="4" height="1" fill="currentColor"/>
+      </svg>`,
+      // Shield
+      `<svg width="20" height="20" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="0" width="6" height="1" fill="currentColor"/>
+        <rect x="0" y="1" width="8" height="4" fill="currentColor"/>
+        <rect x="1" y="5" width="6" height="1" fill="currentColor"/>
+        <rect x="2" y="6" width="4" height="1" fill="currentColor"/>
+        <rect x="3" y="7" width="2" height="1" fill="currentColor"/>
+      </svg>`,
+      // Diamond / Crystal
+      `<svg width="20" height="20" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="0" width="2" height="1" fill="currentColor"/>
+        <rect x="2" y="1" width="4" height="1" fill="currentColor"/>
+        <rect x="1" y="2" width="6" height="2" fill="currentColor"/>
+        <rect x="2" y="4" width="4" height="2" fill="currentColor"/>
+        <rect x="3" y="6" width="2" height="1" fill="currentColor"/>
+      </svg>`,
+      // Mushroom
+      `<svg width="20" height="20" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="0" width="4" height="1" fill="currentColor"/>
+        <rect x="1" y="1" width="6" height="3" fill="currentColor"/>
+        <rect x="3" y="4" width="2" height="3" fill="currentColor"/>
+        <rect x="2" y="7" width="4" height="1" fill="currentColor"/>
+      </svg>`,
+      // Arrow
+      `<svg width="20" height="20" viewBox="0 0 8 8" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="0" width="2" height="1" fill="currentColor"/>
+        <rect x="2" y="1" width="4" height="1" fill="currentColor"/>
+        <rect x="3" y="2" width="2" height="5" fill="currentColor"/>
+        <rect x="1" y="5" width="1" height="2" fill="currentColor"/>
+        <rect x="6" y="5" width="1" height="2" fill="currentColor"/>
+      </svg>`,
+    ];
+
+    const PARTICLE_COLORS = [
+      "#e94560", "#4ecca3", "#f0c040", "#60a0ff",
+      "#ff70b0", "#a070ff", "#70ffd0", "#ffaa40",
+    ];
+
+    let particleInterval = null;
+
+    function spawnParticle() {
+      const container = $("#particleCanvas");
+      if (!container) return;
+
+      const booth = $(".booth");
+      if (!booth) return;
+
+      const shape = PIXEL_SHAPES[Math.floor(Math.random() * PIXEL_SHAPES.length)];
+      const color = PARTICLE_COLORS[Math.floor(Math.random() * PARTICLE_COLORS.length)];
+
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = shape;
+      const svg = wrapper.firstElementChild;
+
+      const size = 14 + Math.random() * 12;
+      svg.style.width = size + "px";
+      svg.style.height = size + "px";
+      svg.style.color = color;
+
+      // Spawn along top, left, and right edges — fly mostly upward
+      const cRect = container.getBoundingClientRect();
+      const bRect = booth.getBoundingClientRect();
+
+      const bLeft = bRect.left - cRect.left;
+      const bTop = bRect.top - cRect.top;
+      const bRight = bLeft + bRect.width;
+
+      // Weighted pick: 60% top, 20% left, 20% right
+      const roll = Math.random();
+      let startX, startY, dx, dy;
+
+      if (roll < 0.6) {
+        // top edge
+        startX = bLeft + Math.random() * bRect.width;
+        startY = bTop;
+        dx = -50 + Math.random() * 100;
+        dy = -(100 + Math.random() * 120);
+      } else if (roll < 0.8) {
+        // left edge, upper half
+        startX = bLeft;
+        startY = bTop + Math.random() * bRect.height * 0.5;
+        dx = -(30 + Math.random() * 60);
+        dy = -(60 + Math.random() * 100);
+      } else {
+        // right edge, upper half
+        startX = bRight;
+        startY = bTop + Math.random() * bRect.height * 0.5;
+        dx = 30 + Math.random() * 60;
+        dy = -(60 + Math.random() * 100);
+      }
+
+      svg.style.left = startX + "px";
+      svg.style.top = startY + "px";
+
+      const duration = 2.5 + Math.random() * 2;
+      const rotEnd = -90 + Math.random() * 180;
+      svg.style.setProperty("--dx", dx + "px");
+      svg.style.setProperty("--dy", dy + "px");
+      svg.style.setProperty("--rot-end", rotEnd + "deg");
+      svg.style.animationDuration = duration + "s";
+
+      container.appendChild(svg);
+      setTimeout(() => svg.remove(), duration * 1000 + 100);
+    }
+
+    function startParticles() {
+      stopParticles();
+      // Spawn a burst of 3 immediately, then steady stream
+      for (let i = 0; i < 3; i++) setTimeout(spawnParticle, i * 200);
+      particleInterval = setInterval(() => {
+        // Spawn 1-2 at a time for organic feel
+        spawnParticle();
+        if (Math.random() > 0.5) setTimeout(spawnParticle, 150);
+      }, 700);
+    }
+
+    function stopParticles() {
+      if (particleInterval) {
+        clearInterval(particleInterval);
+        particleInterval = null;
+      }
+    }
+
+    // ── Job cancellation ──
+
+    async function cancelCurrentJob() {
+      if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = null; }
+      if (eventSource) { eventSource.close(); eventSource = null; }
+      stopElapsedTimer();
+      stopParticles();
+      stopTrickle();
+      if (currentClientId) {
+        fetch(`/api/cancel/${currentClientId}`, { method: "POST" }).catch(() => {});
+        currentClientId = null;
+      }
+    }
+
+    $("#cancelBtn").addEventListener("click", async () => {
+      await cancelCurrentJob();
+      showScreen("camera");
+      // Keep the photo so user can retry
+      if (capturedBlob) {
+        showPhotoPreview();
+      } else {
+        resetToCamera();
+      }
+    });
+
+    // ── Generate Sprite ──
+
+    let lastAction = "dancing";
+
+    async function runGenerate(blob, action) {
+      showScreen("processing");
+      clearLog();
+      statusText.textContent = "Uploading your photo...";
+      progressBar.className = "pixel-progress-bar indeterminate";
+      progressPct.textContent = "";
+      addLog("> Uploading photo to cloud...", "active");
+      startElapsedTimer();
+      startParticles();
+
+      try {
+        const formData = new FormData();
+        formData.append("photo", blob, "photo.png");
+        formData.append("action", action);
+
+        const submitRes = await fetch("/api/generate", {
+          method: "POST",
+          headers: getApiKeyHeaders(),
+          body: formData,
+        });
+
+        if (!submitRes.ok) {
+          const err = await submitRes.json().catch(() => ({}));
+          throw new Error(err.error || "Failed to submit");
+        }
+
+        const { client_id } = await submitRes.json();
+        currentClientId = client_id;
+        addLog("> Photo uploaded, connecting to progress stream...", "done");
+
+        // Save input photo to server memory for later disk save
+        const inputForm = new FormData();
+        inputForm.append("photo", blob, "photo.png");
+        inputForm.append("client_id", client_id);
+        fetch("/api/save-input", { method: "POST", body: inputForm }).catch(() => {});
+
+        // Auto-timeout after 120 seconds
+        timeoutTimer = setTimeout(async () => {
+          addLog("> Timed out after 120s — retrying...", "error");
+          await cancelCurrentJob();
+          runGenerate(blob, action);
+        }, 120000);
+
+        // Connect to SSE for real-time progress
+        await streamProgress(client_id);
+
+        // Success path — clear timeout
+        if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = null; }
+      } catch (err) {
+        if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = null; }
+        stopElapsedTimer();
+        stopParticles();
+        stopTrickle();
+        const msg = err.message || "Something went wrong";
+        if (msg.toLowerCase().includes("api key")) {
+          // Show key setup if missing
+          $("#keySetup").classList.remove("hidden");
+        }
+        showError(msg);
+      }
+    }
+
+    generateBtn.addEventListener("click", () => {
+      if (!capturedBlob) return;
+      lastAction = $("#actionInput").value.trim() || "dancing";
+      runGenerate(capturedBlob, lastAction);
+    });
+
+    $("#retryBtn").addEventListener("click", () => {
+      if (!capturedBlob) return;
+      runGenerate(capturedBlob, lastAction);
+    });
+
+    function streamProgress(clientId) {
+      return new Promise((resolve, reject) => {
+        if (eventSource) eventSource.close();
+
+        let promptId = null;
+        eventSource = new EventSource(`/api/progress/${clientId}`);
+
+        eventSource.onmessage = async (e) => {
+          try {
+            const event = JSON.parse(e.data);
+            handleProgressEvent(event);
+
+            if (event.type === "submitted") {
+              promptId = event.prompt_id;
+            }
+
+            if (event.type === "completed") {
+              eventSource.close();
+              eventSource = null;
+              stopElapsedTimer();
+              stopParticles();
+              addLog("> Done! Fetching your sprites...", "done");
+              statusText.textContent = "Fetching your sprites...";
+              const pid = promptId || event.prompt_id;
+              await fetchOutputs(pid);
+              resolve();
+            }
+
+            if (event.type === "error") {
+              eventSource.close();
+              eventSource = null;
+              stopElapsedTimer();
+              stopParticles();
+              reject(new Error(event.message || "Workflow failed"));
+            }
+          } catch (err) {
+            // ignore parse errors
+          }
+        };
+
+        eventSource.onerror = () => {
+          // EventSource will auto-reconnect, but if it keeps failing, bail
+          addLog("> Connection interrupted, reconnecting...", "error");
+        };
+      });
+    }
+
+    function handleProgressEvent(event) {
+      switch (event.type) {
+        case "submitted":
+          addLog(`> Job submitted: ${event.prompt_id.slice(0, 8)}...`, "done");
+          statusText.textContent = "Queued, waiting for GPU...";
+          break;
+
+        case "queue":
+          if (event.queue_remaining > 0) {
+            statusText.textContent = `In queue (${event.queue_remaining} ahead)...`;
+            addLog(`> Queue position: ${event.queue_remaining} remaining`);
+          }
+          break;
+
+        case "started":
+          statusText.textContent = "Execution started!";
+          addLog("> Execution started", "done");
+          progressBar.classList.remove("indeterminate");
+          progressBar.style.width = "0%";
+          break;
+
+        case "node_start":
+          statusText.textContent = event.node_name;
+          addLog(`> ${event.node_name}...`, "active");
+          updateProgress(event.nodes_completed, event.nodes_total);
+          // Node 98 is the Nano Banana AI call (~30-40s with no sub-progress)
+          // Fake-fill ~20% over 35s so the bar feels alive
+          if (event.node_id === "98") {
+            const basePct = Math.round((event.nodes_completed / event.nodes_total) * 100);
+            startTrickle(basePct, 20, 50000);
+          }
+          break;
+
+        case "progress":
+          // Sub-node progress (e.g., model loading steps)
+          if (event.max > 1) {
+            const subPct = Math.round((event.value / event.max) * 100);
+            statusText.textContent = `${event.node_name} (${subPct}%)`;
+            // Blend sub-progress into overall progress
+            const overallBase = event.nodes_completed / event.nodes_total;
+            const overallStep = 1 / event.nodes_total;
+            const blended = overallBase + overallStep * (event.value / event.max);
+            const totalPct = Math.round(blended * 100);
+            progressBar.style.width = totalPct + "%";
+            progressPct.textContent = totalPct + "%";
+          }
+          break;
+
+        case "node_done":
+          // Mark the previous active log entry as done
+          const activeEntries = activityLog.querySelectorAll(".log-entry.active");
+          activeEntries.forEach((el) => {
+            el.classList.remove("active");
+            el.classList.add("done");
+          });
+          updateProgress(event.nodes_completed, event.nodes_total);
+          break;
+
+        case "cached":
+          addLog(`> ${event.count} node(s) cached, skipping`, "cached");
+          updateProgress(event.nodes_completed, event.nodes_total);
+          break;
+
+        case "completed":
+          progressBar.style.width = "100%";
+          progressPct.textContent = "100%";
+          break;
+
+        case "error":
+          addLog(`> ERROR: ${event.message}`, "error");
+          if (event.node_name) {
+            addLog(`>   at: ${event.node_name}`, "error");
+          }
+          break;
+
+        case "info":
+          addLog(`> [${event.message}]`);
+          break;
+      }
+    }
+
+    async function fetchOutputs(promptId) {
+      const res = await fetch(`/api/history/${promptId}`, {
+        headers: getApiKeyHeaders(),
+      });
+      if (!res.ok) throw new Error("Failed to fetch outputs");
+
+      const data = await res.json();
+      const outputs = data.outputs || {};
+
+      // Match by node ID — stable regardless of cloud filename hashing
+      // Node 82 = GIF (VHS_VideoCombine), Node 87 = WebP (VHS_VideoCombine)
+      // Node 64 = sprite sheet w/ transparency, Node 2 = sprite sheet
+      console.log("Outputs by node:", outputs);
+
+      const buildUrl = (f) =>
+        `/api/view?filename=${encodeURIComponent(f.filename)}&subfolder=${encodeURIComponent(f.subfolder || "")}&type=${encodeURIComponent(f.type || "output")}`;
+
+      // Fetch a cloud file through the proxy with API key header, return blob URL
+      async function fetchBlobUrl(fileInfo) {
+        const res = await fetch(buildUrl(fileInfo), { headers: getApiKeyHeaders() });
+        if (!res.ok) return null;
+        const blob = await res.blob();
+        return URL.createObjectURL(blob);
+      }
+
+      const getFile = (nodeId) => {
+        const out = outputs[nodeId];
+        if (!out) return null;
+        if (out.gifs?.length) return out.gifs[0];
+        if (out.images?.length) return out.images[0];
+        return null;
+      };
+
+      const gifFile = getFile("82");
+      const webpFile = getFile("87");
+      const sheetFile = getFile("64") || getFile("2");
+
+      console.log("GIF:", gifFile, "WebP:", webpFile, "Sheet:", sheetFile);
+
+      if (gifFile) {
+        const gifUrl = await fetchBlobUrl(gifFile);
+        if (gifUrl) {
+          $("#resultGif").src = gifUrl;
+          $("#downloadGif").href = gifUrl;
+          $("#resultGif").style.display = "block";
+          $("#downloadGif").style.display = "inline-block";
+        }
+      }
+
+      if (webpFile) {
+        const webpUrl = await fetchBlobUrl(webpFile);
+        if (webpUrl) {
+          $("#downloadWebp").href = webpUrl;
+          $("#downloadWebp").style.display = "inline-block";
+        }
+      }
+
+      if (sheetFile) {
+        const sheetUrl = await fetchBlobUrl(sheetFile);
+        if (sheetUrl) {
+          $("#resultSheet").src = sheetUrl;
+          $("#resultSheet").style.display = "block";
+          $("#downloadSheet").href = sheetUrl;
+          $("#downloadSheet").style.display = "inline-block";
+        }
+      }
+
+      if (!gifFile && !sheetFile) {
+        for (const output of Object.values(outputs)) {
+          const file = output.images?.[0] || output.gifs?.[0];
+          if (file) {
+            const url = await fetchBlobUrl(file);
+            if (url) {
+              $("#resultSheet").src = url;
+              $("#resultSheet").style.display = "block";
+            }
+            break;
+          }
+        }
+      }
+
+      showScreen("result");
+
+      // Auto-save outputs to disk
+      try {
+        await fetch(`/api/save-outputs/${promptId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...getApiKeyHeaders() },
+          body: JSON.stringify({ clientId: currentClientId }),
+        });
+        console.log("Outputs saved to disk");
+      } catch (err) {
+        console.warn("Failed to auto-save outputs:", err);
+      }
+    }
+
+    // ── Screen Management ──
+
+    function showScreen(name) {
+      $("#cameraScreen").style.display = name === "camera" ? "block" : "none";
+      $("#processingScreen").style.display = name === "processing" ? "flex" : "none";
+      $("#resultScreen").style.display = name === "result" ? "flex" : "none";
+      errorMsg.style.display = "none";
+      if (name !== "processing") $("#particleCanvas").innerHTML = "";
+    }
+
+    function showError(msg) {
+      showScreen("camera");
+      resetToCamera();
+      errorMsg.textContent = msg;
+      errorMsg.style.display = "block";
+    }
+
+    $("#restartBtn").addEventListener("click", () => {
+      showScreen("camera");
+      resetToCamera();
+      if (eventSource) { eventSource.close(); eventSource = null; }
+      if (timeoutTimer) { clearTimeout(timeoutTimer); timeoutTimer = null; }
+      stopElapsedTimer();
+      stopParticles();
+      stopTrickle();
+      $("#resultGif").src = "";
+      $("#resultSheet").src = "";
+      $("#downloadGif").href = "#";
+      $("#downloadWebp").href = "#";
+      $("#downloadWebp").style.display = "none";
+      $("#downloadSheet").href = "#";
+      $("#downloadSheet").style.display = "none";
+      currentClientId = null;
+    });
+
+    // ── Gallery ──
+
+    function showView(view) {
+      // view: "main", "gallery", "detail"
+      $("main").style.display = view === "main" ? "flex" : "none";
+      $("#galleryScreen").classList.toggle("visible", view === "gallery");
+      $("#galleryDetail").classList.toggle("visible", view === "detail");
+      $("#historyBtn").style.display = view === "main" ? "block" : "none";
+    }
+
+    $("#historyBtn").addEventListener("click", async () => {
+      showView("gallery");
+      await loadGallery();
+    });
+
+    $("#galleryBackBtn").addEventListener("click", () => showView("main"));
+    $("#detailBackBtn").addEventListener("click", () => showView("gallery"));
+
+    async function loadGallery() {
+      const grid = $("#galleryGrid");
+      const empty = $("#galleryEmpty");
+      grid.innerHTML = "";
+
+      try {
+        const res = await fetch("/api/gallery");
+        const entries = await res.json();
+
+        if (!entries.length) {
+          empty.classList.remove("hidden");
+          return;
+        }
+        empty.classList.add("hidden");
+
+        for (const meta of entries) {
+          const card = document.createElement("div");
+          card.className = "gallery-card";
+          const thumbSrc = meta.hasGif
+            ? `/outputs/${meta.promptId}/sprite-animation.gif`
+            : meta.hasSheet
+            ? `/outputs/${meta.promptId}/sprite-sheet.png`
+            : "";
+          const date = new Date(meta.timestamp);
+          const dateStr = date.toLocaleDateString() + " " + date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+          card.innerHTML = `
+            <img src="${thumbSrc}" alt="Sprite" loading="lazy">
+            <div class="gallery-card-info">${dateStr}</div>
+          `;
+          card.addEventListener("click", () => openDetail(meta));
+          grid.appendChild(card);
+        }
+      } catch (err) {
+        console.error("Failed to load gallery:", err);
+        empty.textContent = "Failed to load history.";
+        empty.classList.remove("hidden");
+      }
+    }
+
+    function openDetail(meta) {
+      const base = `/outputs/${meta.promptId}`;
+
+      const detailInput = $("#detailInput");
+      if (meta.hasInput) {
+        detailInput.src = `${base}/input.png`;
+        detailInput.style.display = "block";
+        detailInput.previousElementSibling.style.display = "block";
+      } else {
+        detailInput.style.display = "none";
+        detailInput.previousElementSibling.style.display = "none";
+      }
+
+      const detailGif = $("#detailGif");
+      if (meta.hasGif) {
+        detailGif.src = `${base}/sprite-animation.gif`;
+        detailGif.style.display = "block";
+        detailGif.previousElementSibling.style.display = "block";
+        $("#detailDownloadGif").href = `${base}/sprite-animation.gif`;
+        $("#detailDownloadGif").style.display = "inline-block";
+      } else {
+        detailGif.style.display = "none";
+        detailGif.previousElementSibling.style.display = "none";
+        $("#detailDownloadGif").style.display = "none";
+      }
+
+      const detailSheet = $("#detailSheet");
+      if (meta.hasSheet) {
+        detailSheet.src = `${base}/sprite-sheet.png`;
+        detailSheet.style.display = "block";
+        detailSheet.previousElementSibling.style.display = "block";
+        $("#detailDownloadSheet").href = `${base}/sprite-sheet.png`;
+        $("#detailDownloadSheet").style.display = "inline-block";
+      } else {
+        detailSheet.style.display = "none";
+        detailSheet.previousElementSibling.style.display = "none";
+        $("#detailDownloadSheet").style.display = "none";
+      }
+
+      if (meta.hasWebp) {
+        $("#detailDownloadWebp").href = `${base}/sprite-animation.webp`;
+        $("#detailDownloadWebp").style.display = "inline-block";
+      } else {
+        $("#detailDownloadWebp").style.display = "none";
+      }
+
+      const date = new Date(meta.timestamp);
+      $("#detailDate").textContent = date.toLocaleDateString() + " " + date.toLocaleTimeString();
+
+      showView("detail");
+    }
+
+    // ── API Key Management ──
+
+    const KEY_STORAGE = "comfy_api_key";
+    let hasServerKey = false;
+
+    function getStoredKey() {
+      return localStorage.getItem(KEY_STORAGE) || "";
+    }
+
+    function getApiKeyHeaders() {
+      const key = getStoredKey();
+      return key ? { "X-Comfy-Api-Key": key } : {};
+    }
+
+    async function checkServerKey() {
+      try {
+        const res = await fetch("/api/has-server-key");
+        const data = await res.json();
+        hasServerKey = data.hasKey;
+      } catch {
+        hasServerKey = false;
+      }
+    }
+
+    async function ensureApiKey() {
+      await checkServerKey();
+      if (hasServerKey || getStoredKey()) {
+        $("#keySetup").classList.add("hidden");
+        return;
+      }
+      // No key anywhere — show setup
+      $("#keySetup").classList.remove("hidden");
+    }
+
+    $("#keySetupSave").addEventListener("click", () => {
+      const key = $("#keySetupInput").value.trim();
+      if (!key) {
+        $("#keySetupError").textContent = "Please enter your API key";
+        $("#keySetupError").style.display = "block";
+        return;
+      }
+      localStorage.setItem(KEY_STORAGE, key);
+      $("#keySetup").classList.add("hidden");
+    });
+
+    $("#settingsBtn").addEventListener("click", () => {
+      $("#settingsKeyInput").value = getStoredKey();
+      $("#settingsModal").classList.remove("hidden");
+    });
+
+    $("#settingsClose").addEventListener("click", () => {
+      $("#settingsModal").classList.add("hidden");
+    });
+
+    $("#settingsKeySave").addEventListener("click", () => {
+      const key = $("#settingsKeyInput").value.trim();
+      if (key) {
+        localStorage.setItem(KEY_STORAGE, key);
+      }
+      $("#settingsModal").classList.add("hidden");
+    });
+
+    $("#settingsKeyDelete").addEventListener("click", () => {
+      localStorage.removeItem(KEY_STORAGE);
+      $("#settingsKeyInput").value = "";
+      $("#settingsModal").classList.add("hidden");
+    });
+
+    // ── Init ──
+
+    startCamera();
+    ensureApiKey();
+  </script>
+</body>
+</html>
